@@ -4,7 +4,7 @@
 // results go back to the model → repeat until it writes a final answer.
 
 import dotenv from "dotenv";
-import { TOOLS, TOOL_SOURCES, executeTool } from "./toolDefinitions.js";
+import { TOOLS, TOOL_SOURCES, executeTool, sanitizeArgs } from "./toolDefinitions.js";
 dotenv.config();
 
 const BASE_URL  = process.env.NEBIUS_BASE_URL || "https://api.tokenfactory.nebius.com/v1";
@@ -124,7 +124,9 @@ export async function runAgent({ systemPrompt, question, history = [], onEvent =
         const id = call.id || `${step}-${i}`;
         let args = {};
         try {
-          args = JSON.parse(call.function?.arguments || "{}");
+          // Report the arguments the tool really runs with ("riau" → "Riau", unknown
+          // province dropped), so the trace and the frontend's map links match the data
+          args = sanitizeArgs(JSON.parse(call.function?.arguments || "{}"));
         } catch {
           onEvent({ type: "tool_start", id, name, args });
           onEvent({ type: "tool_end", id, name, ok: false, ms: 0 });

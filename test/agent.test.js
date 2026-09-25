@@ -350,3 +350,18 @@ test("stream endpoint sends the steps, then the answer, as server-sent events", 
     server.close();
   }
 });
+
+test("tool calls are reported with the arguments that actually ran", async () => {
+  mockNebius([
+    { role: "assistant", content: "", tool_calls: [
+      { id: "c1", type: "function", function: { name: "query_fire_hotspots", arguments: '{"province":"riau","days":"1"}' } },
+      { id: "c2", type: "function", function: { name: "query_air_quality", arguments: '{"province":"Atlantis"}' } },
+    ]},
+    { role: "assistant", content: "ok" },
+  ]);
+  const starts = [];
+  const out = await runAgent({ systemPrompt: "sys", question: "q", onEvent: (e) => e.type === "tool_start" && starts.push(e.args) });
+
+  assert.deepEqual(out.toolCalls.map((c) => c.args), [{ province: "Riau", days: 1 }, {}]); // unknown province → national
+  assert.deepEqual(starts, [{ province: "Riau", days: 1 }, {}]);
+});

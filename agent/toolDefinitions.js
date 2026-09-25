@@ -160,7 +160,7 @@ export async function executeTool(name, args = {}) {
 
 // Models sometimes send days as a string or out of range, or a province
 // that isn't in the list. Normalise before it hits the database.
-function sanitizeArgs(args) {
+export function sanitizeArgs(args) {
   const out = { ...args };
   if (out.days !== undefined) {
     const d = parseInt(out.days, 10);
