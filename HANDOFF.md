@@ -1,6 +1,10 @@
 # Handoff: deploying Bumi Watch
 
-For whoever deploys the backend (this repo) and the frontend (`bumiwatch-frontend-install`, not in this repo).
+For whoever deploys the backend (this repo) and the frontend
+([HanifWinson/bumi-watch-frontend](https://github.com/HanifWinson/bumi-watch-frontend)).
+
+**Step-by-step deployment guide (Railway + Firebase):** [`DEPLOYMENT.md` in the frontend repo](https://github.com/HanifWinson/bumi-watch-frontend/blob/main/DEPLOYMENT.md).
+This file is the background: what the backend needs and why.
 Written 2026-09-25, after a round of backend fixes. The README covers what the project is; this covers
 what you need to know to put it online.
 
@@ -74,7 +78,7 @@ It's already set up for Firebase Hosting (`.firebaserc` → project `bumi-watch`
 `VITE_API_URL` is baked in **at build time**, so set it before building:
 
 ```bash
-cd bumiwatch-frontend-install
+cd bumi-watch-frontend
 echo 'VITE_API_URL="https://<backend>"' > .env.production   # no trailing slash needed
 npm ci && npm run build
 firebase deploy --only hosting
@@ -117,4 +121,4 @@ npm test                # 27 offline tests, no keys needed
 npm start               # API + pipeline on http://localhost:3001
 ```
 
-Frontend: `npm run dev` in `bumiwatch-frontend-install` (http://localhost:3000); it talks to `localhost:3001` by default.
+Frontend: `npm run dev` in the frontend repo (http://localhost:3000); it talks to `localhost:3001` by default.
