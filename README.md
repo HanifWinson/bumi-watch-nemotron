@@ -158,8 +158,8 @@ Every response includes metadata: which tools were called, with what arguments, 
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/HanifWinson/bumi-watch-project.git
-cd bumi-watch-project
+git clone https://github.com/HanifWinson/bumi-watch-nemotron.git
+cd bumi-watch-nemotron
 
 # 2. Install dependencies
 npm install
@@ -220,7 +220,7 @@ Invoke-WebRequest -Uri "http://localhost:3001/api/agent" `
 ## 📁 Project Structure
 
 ```
-bumi-watch-project/
+bumi-watch-nemotron/
 ├── agent/
 │   ├── index.js           # Express server — /api/agent, /api/dashboard, /api/province
 │   ├── dashboard.js       # Read-only dashboard + province data for the frontend
