@@ -7,7 +7,8 @@ import { db, sinceISO } from "../config/db.js";
 import { INDONESIA_PROVINCES } from "../utils/helpers.js";
 import { queryFireHotspots, queryEarthquakes, queryRainfall, queryCrossCorrelation } from "./tools.js";
 
-const MAX_FIRE_POINTS = 2000;
+// Enough for a busy day in full (~5–8k); longer periods are sampled evenly.
+const MAX_FIRE_POINTS = 12000;
 const MAX_QUAKES = 50;
 
 export function clampDays(value, fallback = 1) {
@@ -50,12 +51,15 @@ export async function getDashboard({ days = 1 } = {}) {
     queryRainfall({ days, limit: 0 }),
   ]);
 
+  // Over the cap, take every n-th row so the sample covers the whole period
+  // and every province, rather than just the most recent fires.
+  const step = Math.max(1, Math.ceil(fires.total_count / MAX_FIRE_POINTS));
   const firePoints = db.prepare(`
-    SELECT lat, lon, frp, confidence, satellite, timestamp, province
+    SELECT ROUND(lat, 3) AS lat, ROUND(lon, 3) AS lon, frp, timestamp
     FROM fire_hotspots
-    WHERE timestamp >= @since AND lat IS NOT NULL AND lon IS NOT NULL
+    WHERE timestamp >= @since AND lat IS NOT NULL AND lon IS NOT NULL AND id % @step = 0
     ORDER BY timestamp DESC LIMIT @limit
-  `).all({ since, limit: MAX_FIRE_POINTS });
+  `).all({ since, step, limit: MAX_FIRE_POINTS });
 
   const quakeEvents = db.prepare(`
     SELECT lat, lon, magnitude, depth_km, description, severity, timestamp, province

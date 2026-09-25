@@ -277,3 +277,20 @@ test("air quality results carry the AQI category, so the model doesn't guess it"
   assert.equal(riau.max_category, "Unhealthy");
   assert.equal(r.overall_max_category, "Unhealthy");
 });
+
+test("dashboard samples fire points evenly when there are more than it sends", async () => {
+  const { getDashboard } = await import("../agent/dashboard.js");
+  const many = Array.from({ length: 30000 }, (_, i) => ({
+    timestamp: hoursAgo((i / 30000) * 24 * 6.5), // spread over 6.5 days
+    province: "Riau", coordinates: { lat: 1 + (i % 1000) / 1000, lon: 101 + i / 30000 }, satellite: "VIIRS",
+  }));
+  insertDocs("fire_hotspots", many);
+
+  const d = await getDashboard({ days: 7 });
+  assert.ok(d.fires.total > 30000);
+  assert.ok(d.fires.points.length <= 12000 && d.fires.points.length > 9000);
+  assert.ok(d.fires.points_truncated);
+  const oldest = Math.min(...d.fires.points.map((p) => new Date(p.timestamp).getTime()));
+  assert.ok(Date.now() - oldest > 6 * 24 * 3600e3); // covers the week, not just the latest fires
+  assert.deepEqual(Object.keys(d.fires.points[0]).sort(), ["frp", "lat", "lon", "timestamp"]);
+});

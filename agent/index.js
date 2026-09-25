@@ -4,6 +4,7 @@
 
 import express from "express";
 import cors    from "cors";
+import compression from "compression";
 import dotenv  from "dotenv";
 import { runAgent }      from "./nemotron.js";
 import { SYSTEM_PROMPT } from "./prompts.js";
@@ -21,6 +22,7 @@ const MODEL = process.env.NEMOTRON_MODEL || "nvidia/NVIDIA-Nemotron-3-Nano-30B-A
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
 app.use(cors(CORS_ORIGINS.length ? { origin: CORS_ORIGINS } : undefined));
 app.use(express.json({ limit: "32kb" }));
+app.use(compression()); // the dashboard's fire points are ~1 MB of JSON before gzip
 
 // Behind a proxy (Render, Fly, Railway, nginx) set TRUST_PROXY=1 so req.ip is the
 // visitor's address rather than the proxy's.
