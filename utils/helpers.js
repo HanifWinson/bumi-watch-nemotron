@@ -16,18 +16,12 @@ export const INDONESIA_PROVINCES = [
   "Papua Barat", "Papua Barat Daya", "Papua", "Papua Selatan", "Papua Tengah", "Papua Pegunungan",
 ];
 
-// One point per province, for sources that are queried by point (rainfall).
-// Centroids of the province outlines, plus the capitals of the provinces the
-// outline file predates.
+// One point per province, for sources that are queried by point (rainfall):
+// the centroid of each of the 38 province outlines. Kepulauan Riau's largest
+// island is remote Natuna, so it's measured at its capital instead.
 export const PROVINCE_CENTERS = {
   ...provinceCentroids(),
-  "Kepulauan Riau":   { lat:  0.9186, lon: 104.4450 }, // Tanjung Pinang
-  "Kalimantan Utara": { lat:  2.8400, lon: 117.3700 }, // Tanjung Selor
-  "Sulawesi Barat":   { lat: -2.6800, lon: 118.8900 }, // Mamuju
-  "Papua Barat Daya": { lat: -0.8800, lon: 131.2600 }, // Sorong
-  "Papua Selatan":    { lat: -8.4900, lon: 140.4000 }, // Merauke
-  "Papua Tengah":     { lat: -3.3700, lon: 135.5000 }, // Nabire
-  "Papua Pegunungan": { lat: -4.1000, lon: 138.9500 }, // Wamena
+  "Kepulauan Riau": { lat: 0.9186, lon: 104.445 }, // Tanjung Pinang
 };
 
 // ─── AQI calculation (US EPA standard) ──────────────────────────────────────

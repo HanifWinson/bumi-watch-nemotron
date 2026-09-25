@@ -94,10 +94,11 @@ These landed on 2026-09-25 and change what the frontend receives:
   pollutant list) is now out of date.
 - **"24h" is a true rolling 24 hours** (it used to reach back to midnight UTC yesterday, up to 48 h). Counts on
   the default view are smaller and now correct.
-- **Provinces are assigned with the same outlines the map draws** (`public/indonesia-provinces.geojson`, copied to
-  `utils/`). Fires in Kalimantan Tengah no longer show up as Kalimantan Barat, and the province panel's station list fills in.
-- **Rainfall covers all 38 provinces.** Seven of them (Kepulauan Riau, Kalimantan Utara, Sulawesi Barat and the four
-  new Papua provinces) have no outline on the map, so they appear in rankings but can't be clicked on the map.
+- **All 38 provinces, with the same outlines the map draws** (`public/indonesia-provinces.geojson`, copied to
+  `utils/`; CC BY 4.0, [denyherianto/indonesia-geojson-topojson-maps-with-38-provinces](https://github.com/denyherianto/indonesia-geojson-topojson-maps-with-38-provinces)),
+  including the 2022 Papua split, Kepulauan Riau, Kalimantan Utara and Sulawesi Barat. Whether a point is in
+  Indonesia at all is still decided by the older, more detailed coastlines in `utils/indonesia-land.geojson`.
+  Rainfall is measured for all 38.
 - **The chat uses `POST /api/agent/stream`** (Server-Sent Events), so it can show each tool call live. If a host or
   proxy buffers responses, the steps arrive all at once at the end; Railway doesn't. The frontend falls back
   to `POST /api/agent` if the stream endpoint is missing.
@@ -106,8 +107,6 @@ These landed on 2026-09-25 and change what the frontend receives:
 
 ## 5. Known gaps
 
-- The map outlines have 32 provinces, not Indonesia's current 38. A proper fix is a 38-province GeoJSON used by both
-  the map and `utils/provinceShapes.js`; until then, points in the newer provinces are counted under their parent province.
 - A question has no overall time limit: up to 6 model calls × 60 s each. Normal questions take 5–20 s.
 - The pipeline log's "N/N sources OK" counts skipped sources (missing keys) as OK.
 - Resource Watch datasets (deforestation, CO₂, …) are fetched daily but nothing reads them yet.

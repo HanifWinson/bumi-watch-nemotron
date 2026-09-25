@@ -122,6 +122,18 @@ test("provinces come from the outlines, not overlapping boxes", () => {
   assert.equal(inferProvinceFromCoords(-1.6, 103.6), "Jambi");               // Muaro Jambi
   assert.equal(inferProvinceFromCoords(-7.8, 106.3), "Jawa Barat");          // offshore, snaps to nearest
   assert.equal(inferProvinceFromCoords(-15, 100), "Unknown");                // open Indian Ocean
+  // The 38 current provinces, incl. the 2022 Papua split
+  assert.equal(inferProvinceFromCoords(-8.5, 140.4, 0.2), "Papua Selatan");   // Merauke
+  assert.equal(inferProvinceFromCoords(-0.88, 131.26, 0.2), "Papua Barat Daya"); // Sorong
+  assert.equal(inferProvinceFromCoords(-4.1, 138.95, 0.2), "Papua Pegunungan"); // Wamena
+  assert.equal(inferProvinceFromCoords(1.1, 104.0, 0.2), "Kepulauan Riau");  // Batam
+  assert.equal(inferProvinceFromCoords(2.84, 117.37, 0.2), "Kalimantan Utara"); // Tanjung Selor
+  // Just outside the coarse outlines but on Indonesian land: nearest province
+  assert.equal(inferProvinceFromCoords(3.25, 97.17, 0.1), "Aceh");           // Aceh Selatan station
+  // Neighbouring countries stay out
+  assert.equal(inferProvinceFromCoords(1.55, 110.35, 0.2), "Unknown");       // Kuching, Malaysia
+  assert.equal(inferProvinceFromCoords(-8.56, 125.57, 0.2), "Unknown");      // Dili, Timor-Leste
+  assert.equal(inferProvinceFromCoords(1.35, 103.82, 0.2), "Unknown");       // Singapore
 });
 
 test("WAQI: busy map tiles are split so thinned-out stations are found", async () => {
