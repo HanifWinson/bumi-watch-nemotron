@@ -294,3 +294,59 @@ test("dashboard samples fire points evenly when there are more than it sends", a
   assert.ok(Date.now() - oldest > 6 * 24 * 3600e3); // covers the week, not just the latest fires
   assert.deepEqual(Object.keys(d.fires.points[0]).sort(), ["frp", "lat", "lon", "timestamp"]);
 });
+
+// ─── Live progress ────────────────────────────────────────────────────────────
+const TWO_TOOLS_THEN_ANSWER = [
+  { role: "assistant", content: "", tool_calls: [
+    { id: "c1", type: "function", function: { name: "query_air_quality", arguments: '{"province":"Riau","days":1}' } },
+    { id: "c2", type: "function", function: { name: "query_fire_hotspots", arguments: '{"province":"Riau","days":1}' } },
+  ]},
+  { role: "assistant", content: "AQI Riau 164.\n📍 Sources: WAQI, NASA FIRMS | Period: last 24 hours" },
+];
+
+test("runAgent reports each step as it happens", async () => {
+  mockNebius(TWO_TOOLS_THEN_ANSWER);
+  const events = [];
+  await runAgent({ systemPrompt: "sys", question: "q", onEvent: (e) => events.push(e) });
+
+  assert.deepEqual(events.map((e) => e.type), ["thinking", "tool_start", "tool_start", "tool_end", "tool_end", "thinking"]);
+  assert.equal(events[0].after_tools, false);
+  assert.equal(events[5].after_tools, true);
+  assert.deepEqual(events.filter((e) => e.type === "tool_start").map((e) => [e.id, e.name, e.args.province]),
+    [["c1", "query_air_quality", "Riau"], ["c2", "query_fire_hotspots", "Riau"]]);
+  assert.ok(events.filter((e) => e.type === "tool_end").every((e) => e.ok));
+});
+
+test("a cancelled question stops before the next model call", async () => {
+  mockNebius(TWO_TOOLS_THEN_ANSWER);
+  const controller = new AbortController();
+  const run = runAgent({
+    systemPrompt: "sys", question: "q", signal: controller.signal,
+    onEvent: (e) => e.type === "tool_end" && controller.abort(),
+  });
+  await assert.rejects(run, (err) => err.cancelled === true);
+  assert.equal(sent.length, 1); // never asked the model for the answer
+});
+
+test("stream endpoint sends the steps, then the answer, as server-sent events", async () => {
+  mockNebius(TWO_TOOLS_THEN_ANSWER);
+  const { default: app } = await import("../agent/index.js");
+  const server = app.listen(0);
+  // [::1], not 127.0.0.1: the rate-limit test above already used up that address's quota
+  const url = `http://[::1]:${server.address().port}/api/agent/stream`;
+  try {
+    const res = await realFetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"question":"Udara di Riau?"}' });
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type"), /text\/event-stream/);
+    assert.equal(res.headers.get("content-encoding"), null); // not buffered by gzip
+
+    const events = (await res.text()).split("\n\n").filter((b) => b.startsWith("data: ")).map((b) => JSON.parse(b.slice(6)));
+    assert.deepEqual(events.map((e) => e.type), ["thinking", "tool_start", "tool_start", "tool_end", "tool_end", "thinking", "answer"]);
+    const answer = events.at(-1);
+    assert.match(answer.answer, /AQI Riau 164/);
+    assert.equal(answer.metadata.tool_calls.length, 2);
+    assert.deepEqual(answer.metadata.sources.sort(), ["NASA FIRMS", "WAQI"]);
+  } finally {
+    server.close();
+  }
+});

@@ -96,6 +96,9 @@ These landed on 2026-09-25 and change what the frontend receives:
   `utils/`). Fires in Kalimantan Tengah no longer show up as Kalimantan Barat, and the province panel's station list fills in.
 - **Rainfall covers all 38 provinces.** Seven of them (Kepulauan Riau, Kalimantan Utara, Sulawesi Barat and the four
   new Papua provinces) have no outline on the map, so they appear in rankings but can't be clicked on the map.
+- **The chat uses `POST /api/agent/stream`** (Server-Sent Events), so it can show each tool call live. If a host or
+  proxy buffers responses, the steps arrive all at once at the end; Railway doesn't. The frontend falls back
+  to `POST /api/agent` if the stream endpoint is missing.
 - **`POST /api/agent` can return `429`** with `{"error":"Too many questions. Try again in Ns."}` and a `Retry-After`
   header (10 per minute per IP). Errors no longer include a `details` field; use `error`.
 

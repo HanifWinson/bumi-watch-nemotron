@@ -200,6 +200,7 @@ The volume keeps the SQLite file between restarts.
 | Endpoint | What it returns |
 |----------|-----------------|
 | `POST /api/agent` | `{question, history}` → Nemotron's answer plus the tools it called, sources, steps and latency |
+| `POST /api/agent/stream` | Same, as Server-Sent Events: `thinking`, `tool_start`, `tool_end` as they happen, then `answer` (the chat uses this) |
 | `GET /api/dashboard?days=1` | Stats, AQI stations, fire points and earthquakes for the map (plain SQL, no LLM) |
 | `GET /api/province/:name?days=7` | All four sources for one province |
 | `GET /health` | Model name, row counts and the latest timestamp per table |

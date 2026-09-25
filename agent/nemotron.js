@@ -16,7 +16,7 @@ const TIMEOUT_MS = parseInt(process.env.NEBIUS_TIMEOUT_MS, 10) || 60000;
 const MAX_TOKENS = parseInt(process.env.NEMOTRON_MAX_TOKENS, 10) || 4096;
 
 // ─── Single chat completion call ──────────────────────────────────────────────
-async function chatCompletion({ messages, tools, toolChoice = "auto" }) {
+async function chatCompletion({ messages, tools, toolChoice = "auto", signal }) {
   const apiKey = process.env.NEBIUS_API_KEY;
   if (!apiKey) throw new Error("NEBIUS_API_KEY not set in .env");
 
@@ -34,6 +34,8 @@ async function chatCompletion({ messages, tools, toolChoice = "auto" }) {
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  // The caller can cancel too (the user pressed Stop or closed the page)
+  signal?.addEventListener("abort", () => controller.abort(), { once: true });
 
   let res;
   try {
@@ -47,6 +49,7 @@ async function chatCompletion({ messages, tools, toolChoice = "auto" }) {
       signal: controller.signal,
     });
   } catch (err) {
+    if (signal?.aborted) throw cancelled();
     if (err.name === "AbortError") throw new Error(`Nebius request timed out after ${TIMEOUT_MS}ms`);
     throw err;
   } finally {
@@ -64,13 +67,23 @@ async function chatCompletion({ messages, tools, toolChoice = "auto" }) {
   return { ...choice.message, finish_reason: choice.finish_reason };
 }
 
+function cancelled() {
+  const err = new Error("Cancelled");
+  err.cancelled = true;
+  return err;
+}
+
 // Reasoning models may inline their thinking. Keep only the answer.
 function cleanAnswer(text) {
   return (text ?? "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 }
 
 // ─── Agent loop ───────────────────────────────────────────────────────────────
-export async function runAgent({ systemPrompt, question, history = [] }) {
+// onEvent reports progress as it happens, for the streaming endpoint:
+//   { type: "thinking", step, after_tools }   a model call is starting
+//   { type: "tool_start", id, name, args }    the model asked for a tool
+//   { type: "tool_end", id, name, ok, ms }    that tool finished
+export async function runAgent({ systemPrompt, question, history = [], onEvent = () => {}, signal }) {
   const messages = [
     { role: "system", content: systemPrompt },
     ...formatHistory(history),
@@ -81,7 +94,9 @@ export async function runAgent({ systemPrompt, question, history = [] }) {
   const sources = new Set();
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    const message = await chatCompletion({ messages, tools: TOOLS });
+    if (signal?.aborted) throw cancelled();
+    onEvent({ type: "thinking", step: step + 1, after_tools: toolLog.length > 0 });
+    const message = await chatCompletion({ messages, tools: TOOLS, signal });
     const toolCalls = message.tool_calls || [];
 
     // No tool calls → this is the final answer
@@ -104,21 +119,28 @@ export async function runAgent({ systemPrompt, question, history = [] }) {
 
     // Run all requested tools in parallel
     const results = await Promise.all(
-      toolCalls.map(async (call) => {
+      toolCalls.map(async (call, i) => {
         const name = call.function?.name;
+        const id = call.id || `${step}-${i}`;
         let args = {};
         try {
           args = JSON.parse(call.function?.arguments || "{}");
         } catch {
+          onEvent({ type: "tool_start", id, name, args });
+          onEvent({ type: "tool_end", id, name, ok: false, ms: 0 });
           return { call, name, args, output: { error: "Invalid JSON arguments" } };
         }
+        onEvent({ type: "tool_start", id, name, args });
+        const started = Date.now();
+        let output;
         try {
-          const output = await executeTool(name, args);
+          output = await executeTool(name, args);
           (TOOL_SOURCES[name] || []).forEach((s) => sources.add(s));
-          return { call, name, args, output };
         } catch (err) {
-          return { call, name, args, output: { error: err.message } };
+          output = { error: err.message };
         }
+        onEvent({ type: "tool_end", id, name, ok: !output?.error, ms: Date.now() - started });
+        return { call, name, args, output };
       })
     );
 
@@ -139,7 +161,8 @@ export async function runAgent({ systemPrompt, question, history = [] }) {
     role: "user",
     content: "Answer now using only the data already retrieved. Do not call more tools.",
   });
-  const final = await chatCompletion({ messages });
+  onEvent({ type: "thinking", step: MAX_STEPS + 1, after_tools: true });
+  const final = await chatCompletion({ messages, signal });
   return {
     answer: cleanAnswer(final.content) || "Maaf, saya tidak dapat menyelesaikan permintaan ini.",
     toolCalls: toolLog,

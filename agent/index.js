@@ -22,7 +22,11 @@ const MODEL = process.env.NEMOTRON_MODEL || "nvidia/NVIDIA-Nemotron-3-Nano-30B-A
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
 app.use(cors(CORS_ORIGINS.length ? { origin: CORS_ORIGINS } : undefined));
 app.use(express.json({ limit: "32kb" }));
-app.use(compression()); // the dashboard's fire points are ~1 MB of JSON before gzip
+// The dashboard's fire points are ~1 MB of JSON before gzip. Event streams are
+// left alone: compression would buffer them and the steps would arrive all at once.
+app.use(compression({
+  filter: (req, res) => !String(res.getHeader("Content-Type") || "").startsWith("text/event-stream") && compression.filter(req, res),
+}));
 
 // Behind a proxy (Render, Fly, Railway, nginx) set TRUST_PROXY=1 so req.ip is the
 // visitor's address rather than the proxy's.
@@ -86,43 +90,83 @@ app.get("/api/province/:name", async (req, res) => {
   }
 });
 
-// ─── Main agent endpoint ──────────────────────────────────────────────────────
-app.post("/api/agent", agentRateLimit, async (req, res) => {
+// ─── Agent endpoints ──────────────────────────────────────────────────────────
+function readQuestion(req, res) {
   const { question, history = [] } = req.body || {};
-
   if (!question?.trim()) {
-    return res.status(400).json({ error: "Question is required" });
+    res.status(400).json({ error: "Question is required" });
+    return null;
   }
-
   console.log(`\n🤖 Question: ${question}`);
+  return { question, history: Array.isArray(history) ? history : [] };
+}
+
+function replyBody({ answer, toolCalls, sources, steps }, started) {
+  console.log(`✅ Answer generated in ${steps} step(s), ${toolCalls.length} tool call(s), ${Date.now() - started}ms`);
+  return {
+    answer,
+    metadata: {
+      model:      MODEL,
+      tool_calls: toolCalls,
+      sources,
+      steps,
+      latency_ms: Date.now() - started,
+      timestamp:  new Date().toISOString(),
+    },
+  };
+}
+
+// Upstream error bodies stay in the server log, not in the response
+function publicError(err) {
+  console.error("❌ Agent error:", err.message);
+  return /timed out/i.test(err.message) ? "The model took too long to answer" : "Agent failed to process question";
+}
+
+// One JSON answer when the agent is done
+app.post("/api/agent", agentRateLimit, async (req, res) => {
+  const input = readQuestion(req, res);
+  if (!input) return;
+  const started = Date.now();
+  try {
+    res.json(replyBody(await runAgent({ systemPrompt: SYSTEM_PROMPT, ...input }), started));
+  } catch (err) {
+    res.status(500).json({ error: publicError(err) });
+  }
+});
+
+// Same agent, streamed as Server-Sent Events so the chat can show each step live:
+// thinking → tool_start / tool_end … → answer (or error). See runAgent for the shapes.
+app.post("/api/agent/stream", agentRateLimit, async (req, res) => {
+  const input = readQuestion(req, res);
+  if (!input) return;
   const started = Date.now();
 
+  res.set({
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no", // nginx-style proxies: don't buffer
+  });
+  res.flushHeaders();
+  const send = (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
+
+  // Stop calling the model if the visitor leaves or presses Stop
+  const controller = new AbortController();
+  res.on("close", () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  // Model calls can go quiet for a while; keep proxies from closing the connection
+  const heartbeat = setInterval(() => res.write(": ping\n\n"), 15000);
+
   try {
-    const { answer, toolCalls, sources, steps } = await runAgent({
-      systemPrompt: SYSTEM_PROMPT,
-      question,
-      history: Array.isArray(history) ? history : [],
-    });
-
-    console.log(`✅ Answer generated in ${steps} step(s), ${toolCalls.length} tool call(s), ${Date.now() - started}ms`);
-
-    res.json({
-      answer,
-      metadata: {
-        model:      MODEL,
-        tool_calls: toolCalls,
-        sources,
-        steps,
-        latency_ms: Date.now() - started,
-        timestamp:  new Date().toISOString(),
-      },
-    });
+    const result = await runAgent({ systemPrompt: SYSTEM_PROMPT, ...input, onEvent: send, signal: controller.signal });
+    send({ type: "answer", ...replyBody(result, started) });
   } catch (err) {
-    console.error("❌ Agent error:", err.message);
-    // Upstream error bodies stay in the server log, not in the response
-    res.status(500).json({
-      error: /timed out/i.test(err.message) ? "The model took too long to answer" : "Agent failed to process question",
-    });
+    if (err.cancelled) console.log("⏹️  Question cancelled by the visitor");
+    else send({ type: "error", error: publicError(err) });
+  } finally {
+    clearInterval(heartbeat);
+    res.end();
   }
 });
 
@@ -141,6 +185,7 @@ if (process.env.NODE_ENV !== "test") {
   GET  /api/dashboard?days=1  → map + stats data
   GET  /api/province/:name    → one province, all sources
   POST /api/agent             → ask a question
+  POST /api/agent/stream      → same, streamed step by step (SSE)
 
   curl -X POST http://localhost:${PORT}/api/agent \\
     -H "Content-Type: application/json" \\
