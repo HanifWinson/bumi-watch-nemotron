@@ -69,6 +69,8 @@ curl -X POST https://<backend>/api/agent -H "Content-Type: application/json" \
 ```
 
 The first pipeline run starts with the server and takes a few seconds. `/health` shows `rows: 0` until it finishes.
+On a fresh database that first run also backfills the last 10 days of fires (~85k hotspots, 4 FIRMS requests),
+so the 7-day view and its timelapse have history straight away. It happens once; later runs fetch the last 2 days.
 Logs print one line per source per run, and every question with the tools it called.
 
 ## 3. Deploy the frontend

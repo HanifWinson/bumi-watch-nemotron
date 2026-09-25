@@ -68,8 +68,20 @@ test("BMKG: uses ISO DateTime, parses Indonesian months + WITA, dedupes", async 
 
 test("FIRMS: CSV → rows, re-running the pipeline doesn't double count", async () => {
   mockFetch();
-  await fetchAndIndexFireHotspots();
+  const base = globalThis.fetch;
+  const urls = [];
+  globalThis.fetch = (url, opts) => { if (String(url).includes("firms")) urls.push(String(url)); return base(url, opts); };
+
+  await fetchAndIndexFireHotspots(); // empty database: backfills 10 days
+  const firstRun = urls.splice(0);
   await fetchAndIndexFireHotspots(); // next 30-min run fetches the same 2-day window
+
+  // First run: 2 satellites × (5 days from a start date + the latest 5 days); then just the last 2 days
+  assert.equal(firstRun.length, 4);
+  assert.equal(firstRun.filter((u) => /\/5\/\d{4}-\d{2}-\d{2}$/.test(u)).length, 2);
+  assert.equal(firstRun.filter((u) => /\/5$/.test(u)).length, 2);
+  assert.equal(urls.length, 2);
+  assert.ok(urls.every((u) => /\/2$/.test(u)));
   const r = await queryFireHotspots({ days: 1 });
   // CSV served for both VIIRS and MODIS requests; satellite column comes from
   // the CSV ("N"), so the second satellite's identical rows are also deduped.
