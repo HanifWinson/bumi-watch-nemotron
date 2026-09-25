@@ -1,1 +1,0 @@
-# bumi-watch-nemotron
