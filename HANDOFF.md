@@ -3,7 +3,7 @@
 For whoever deploys the backend (this repo) and the frontend
 ([HanifWinson/bumi-watch-frontend](https://github.com/HanifWinson/bumi-watch-frontend)).
 
-**Step-by-step deployment guide (Railway + Firebase):** [`DEPLOYMENT.md` in the frontend repo](https://github.com/HanifWinson/bumi-watch-frontend/blob/main/DEPLOYMENT.md).
+**Step-by-step deployment guide (Railway + Vercel or any static host):** [`DEPLOYMENT.md` in the frontend repo](https://github.com/HanifWinson/bumi-watch-frontend/blob/main/DEPLOYMENT.md).
 This file is the background: what the backend needs and why.
 Written 2026-09-25, after a round of backend fixes. The README covers what the project is; this covers
 what you need to know to put it online.
@@ -13,7 +13,7 @@ what you need to know to put it online.
 ```
 Frontend (Vite + React, static)  ──HTTPS──▶  Backend (this repo, Node 22 + Express)
   built with VITE_API_URL                      ├─ API: /health, /api/dashboard, /api/province/:name, /api/agent
-  e.g. Firebase Hosting                        ├─ Pipeline: fetches all sources every 30 min, same process
+  any static host, e.g. Vercel                ├─ Pipeline: fetches all sources every 30 min, same process
                                                └─ SQLite file (DB_PATH) ── needs a persistent disk
                                                         ▲
                              NASA FIRMS · WAQI · BMKG · Open-Meteo      Nebius Token Factory (Nemotron)
@@ -51,7 +51,7 @@ Use the Dockerfile. It runs `node agent/index.js` on port 3001 and keeps the dat
 |---|---|
 | `NEBIUS_API_KEY`, `NASA_FIRMS_API_KEY`, `WAQI_API_KEY` | The keys above |
 | `NEMOTRON_MODEL` | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` (the default; exact capitalisation matters, Nebius rejects `nvidia/nemotron-3-nano-30b-a3b`) |
-| `CORS_ORIGINS` | The frontend's URL(s), comma-separated, e.g. `https://bumi-watch.web.app,https://bumi-watch.firebaseapp.com`. Leave unset and any website can call the API and spend Nebius credits. |
+| `CORS_ORIGINS` | The frontend's URL(s), comma-separated, e.g. `https://bumi-watch-frontend.vercel.app`. Leave unset and any website can call the API and spend Nebius credits. |
 | `TRUST_PROXY` | `1` on almost any host (Render, Railway, Fly, Cloud Run, nginx). Without it every visitor shares one rate-limit bucket. |
 | `PORT` | Usually injected by the host; defaults to 3001 |
 | `DB_PATH` | Leave the Dockerfile's `/data/bumiwatch.db` |
@@ -73,16 +73,11 @@ Logs print one line per source per run, and every question with the tools it cal
 
 ## 3. Deploy the frontend
 
-It's already set up for Firebase Hosting (`.firebaserc` → project `bumi-watch`, `firebase.json` serves `dist/`).
+Any static host works (Vercel suggested; step-by-step in the frontend repo's `DEPLOYMENT.md`).
+Build command `npm run build`, output directory `dist`.
 
-`VITE_API_URL` is baked in **at build time**, so set it before building:
-
-```bash
-cd bumi-watch-frontend
-echo 'VITE_API_URL="https://<backend>"' > .env.production   # no trailing slash needed
-npm ci && npm run build
-firebase deploy --only hosting
-```
+`VITE_API_URL` is baked in **at build time**, so set it to the backend URL (no trailing slash) in the host's
+environment variables before building, and rebuild if it changes.
 
 Then put the frontend's final URL(s) in the backend's `CORS_ORIGINS` and restart the backend.
 If the dashboard says "Can't reach the Bumi Watch backend", it's `VITE_API_URL` or CORS. The browser console shows which.
