@@ -10,7 +10,12 @@ const TABLE  = "fire_hotspots";
 
 // Indonesia bounding box (rough)
 // West: 95°E  East: 141°E  South: 11°S  North: 6°N
+// It also covers Malaysia, Brunei, Timor-Leste and southern Philippines.
 const INDONESIA_BBOX = "95,-11,141,6";
+
+// Fires are on land: allow ~20 km for coastlines the simplified outlines cut
+// off. Anything farther out is in a neighbouring country and isn't stored.
+const FIRE_SNAP_DEG = 0.2;
 
 async function fetchHotspots(satellite = "VIIRS_SNPP_NRT", days = 1) {
   // NASA FIRMS requires MAP_KEY not regular API key
@@ -52,7 +57,7 @@ function parseCSV(csvText) {
 function transformHotspot(raw) {
   const lat      = parseFloat(raw.latitude);
   const lon      = parseFloat(raw.longitude);
-  const province = inferProvinceFromCoords(lat, lon);
+  const province = inferProvinceFromCoords(lat, lon, FIRE_SNAP_DEG);
 
   return {
     timestamp:   raw.acq_date && raw.acq_time
@@ -78,10 +83,11 @@ export async function fetchAndIndexFireHotspots() {
   ]);
 
   const allHotspots = [...viirs, ...modis];
-  log(SOURCE, `Fetched ${allHotspots.length} fire hotspots`);
+  const inIndonesia = allHotspots.map(transformHotspot).filter(h => h.province !== "Unknown");
+  log(SOURCE, `Fetched ${allHotspots.length} fire hotspots, ${inIndonesia.length} in Indonesia`);
 
-  if (allHotspots.length === 0) return;
+  if (inIndonesia.length === 0) return;
 
-  const { inserted, skipped } = insertDocs(TABLE, allHotspots.map(raw => transformHotspot(raw)));
+  const { inserted, skipped } = insertDocs(TABLE, inIndonesia);
   log(SOURCE, `Stored ${inserted} new hotspots in ${TABLE} (${skipped} duplicates skipped)`, "success");
 }

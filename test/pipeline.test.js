@@ -31,6 +31,7 @@ const FIRMS_CSV = [
   "latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,instrument,confidence,version,bright_ti5,frp,daynight",
   `0.51,101.44,340.2,0.4,0.4,${today},0523,N,VIIRS,h,2.0NRT,295.1,12.5,D`,
   `0.52,101.45,330.0,0.4,0.4,${today},0523,N,VIIRS,n,2.0NRT,290.0,4.1,D`,
+  `3.38,101.58,335.0,0.4,0.4,${today},0523,N,VIIRS,h,2.0NRT,292.0,9.9,D`, // Selangor, Malaysia: not stored
 ].join("\n");
 
 const WAQI_STATIONS = [

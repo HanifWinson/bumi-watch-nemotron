@@ -70,9 +70,11 @@ export function geoPoint(lat, lon) {
 }
 
 // ─── Infer province from GPS coordinates ─────────────────────────────────────
-export function inferProvinceFromCoords(lat, lon) {
+// maxOffshoreDeg: how far outside a province outline a point may be and still
+// count for it (default ~1.5°, for offshore earthquakes).
+export function inferProvinceFromCoords(lat, lon, maxOffshoreDeg) {
   if (lat == null || lon == null) return "Unknown";
-  return provinceAt(Number(lat), Number(lon));
+  return provinceAt(Number(lat), Number(lon), maxOffshoreDeg);
 }
 
 // ─── Infer Indonesian province from city name ────────────────────────────────
