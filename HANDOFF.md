@@ -3,7 +3,7 @@
 For whoever deploys the backend (this repo) and the frontend
 ([HanifWinson/bumi-watch-frontend](https://github.com/HanifWinson/bumi-watch-frontend)).
 
-**Step-by-step deployment guide (Railway + Vercel or any static host):** [`DEPLOYMENT.md` in the frontend repo](https://github.com/HanifWinson/bumi-watch-frontend/blob/main/DEPLOYMENT.md).
+**Step-by-step deployment guide (Render + Vercel or any static host):** [`DEPLOYMENT.md` in the frontend repo](https://github.com/HanifWinson/bumi-watch-frontend/blob/main/DEPLOYMENT.md).
 This file is the background: what the backend needs and why.
 Written 2026-09-25, after a round of backend fixes. The README covers what the project is; this covers
 what you need to know to put it online.
@@ -44,6 +44,11 @@ Use the Dockerfile. It runs `node agent/index.js` on port 3001 and keeps the dat
 - **A persistent disk mounted at `/data`.** Without it the database is wiped on every restart or redeploy.
   (It refills within seconds of starting, but 7- and 30-day history is lost.)
 - **Always on.** Hosts that sleep idle apps (free tiers of some platforms) stop the 30-minute pipeline, so data goes stale.
+
+A free tier that sleeps and has no disk (e.g. Render Free) still works for a demo: each start refills the
+database within seconds (10 days of fires, current air, quakes, rainfall). Only the 30-day history is lost.
+Avoid Railway for now: after its October 2026 security incident signups are paused and stored environment
+variables may have been exposed.
 
 **Environment variables** (full list with comments in `.env.example`)
 
@@ -100,7 +105,7 @@ These landed on 2026-09-25 and change what the frontend receives:
   Indonesia at all is still decided by the older, more detailed coastlines in `utils/indonesia-land.geojson`.
   Rainfall is measured for all 38.
 - **The chat uses `POST /api/agent/stream`** (Server-Sent Events), so it can show each tool call live. If a host or
-  proxy buffers responses, the steps arrive all at once at the end; Railway doesn't. The frontend falls back
+  proxy buffers responses, the steps arrive all at once at the end (answers still work). The frontend falls back
   to `POST /api/agent` if the stream endpoint is missing.
 - **`POST /api/agent` can return `429`** with `{"error":"Too many questions. Try again in Ns."}` and a `Retry-After`
   header (10 per minute per IP). Errors no longer include a `details` field; use `error`.
@@ -116,7 +121,7 @@ These landed on 2026-09-25 and change what the frontend receives:
 ```bash
 cp .env.example .env    # fill in the three keys
 npm install
-npm test                # 27 offline tests, no keys needed
+npm test                # 32 offline tests, no keys needed
 npm start               # API + pipeline on http://localhost:3001
 ```
 
