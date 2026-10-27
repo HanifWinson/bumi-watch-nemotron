@@ -13,7 +13,6 @@ COPY utils/    ./utils/
 #   docker run -v bumiwatch-data:/data -p 3001:3001 --env-file .env bumiwatch
 ENV DB_PATH=/data/bumiwatch.db
 ENV PORT=3001
-VOLUME /data
 EXPOSE 3001
 
 # Runs the API and the data pipeline in one process (shared SQLite file)
